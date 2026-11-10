@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Arcade Retro Game</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #050505;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #arcade-container {
+            width: 100%;
+            max-width: 420px;
+            height: 100vh;
+            max-height: 750px;
+            background: #0d0d11;
+            border: 3px solid #00ffcc;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* TELA INICIAL / CADASTRO */
+        .screen {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.8rem;
+            color: #ff007f;
+            text-shadow: 0 0 10px #ff007f;
+            margin-bottom: 20px;
+        }
+        label {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        input[type="text"] {
+            background: #000;
+            border: 2px solid #00ffcc;
+            color: #fff;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 1rem;
+            width: 80%;
+            margin-top: 5px;
+            text-align: center;
+            outline: none;
+        }
+        .gender-select {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0 25px 0;
+        }
+        .card {
+            border: 2px solid #555;
+            padding: 15px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            background: #000;
+        }
+        .card.active {
+            border-color: #ff007f;
+            box-shadow: 0 0 12px #ff007f;
+            color: #fff;
+        }
+        .btn-start {
+            background: #ff007f;
+            color: #fff;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 10px #ff007f;
+            text-transform: uppercase;
+        }
+        .btn-start:active {
+            transform: scale(0.95);
+        }
+
+        /* JOGO */
+        #game-screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+        }
+        #hud {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 15px;
+            background: #000;
+            border-bottom: 2px solid #00ffcc;
+            font-size: 0.9rem;
+        }
+        canvas {
+            background: #050508;
+            flex-grow: 1;
+            width: 100%;
+        }
+        #controls {
+            display: flex;
+            height: 70px;
+            background: #000;
+            border-top: 2px solid #00ffcc;
+        }
+        .ctrl-btn {
+            flex: 1;
+            background: #111;
+            color: #00ffcc;
+            font-size: 1.5rem;
+            border: 1px solid #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        .ctrl-btn:active {
+            background: #00ffcc;
+            color: #000;
+        }
+
+        /* GAME OVER OVERLAY */
+        #game-over {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="arcade-container">
+    <!-- TELA 1: SELEÇÃO -->
+    <div id="setup-screen" class="screen">
+        <h1>RETRO RUNNER</h1>
+        <label for="username">Nick do Jogador:</label>
+        <input type="text" id="username" maxlength="10" placeholder="PLAYER1">
+
+        <label>Escolha o Gênero/Heroi:</label>
+        <div class="gender-select">
+            <div class="card active" id="opt-m" onclick="selectGender('M')">
+                👦<br>Homem
+            </div>
+            <div class="card" id="opt-f" onclick="selectGender('F')">
+                👩<br>Mulher
+            </div>
+        </div>
+
+        <button class="btn-start" onclick="startGame()">START GAME</button>
+    </div>
+
+    <!-- TELA 2: GAMEPLAY -->
+    <div id="game-screen">
+        <div id="hud">
+            <span id="player-info">PLAYER</span>
+            <span id="score-display">SCORE: 0</span>
+        </div>
+        <canvas id="canvas"></canvas>
+        <div id="controls">
+            <div class="ctrl-btn" id="btn-left">◀</div>
+            <div class="ctrl-btn" id="btn-right">▶</div>
+        </div>
+
+        <div id="game-over">
+            <h1 style="color:#ff0000; text-shadow: 0 0 10px #ff0000;">GAME OVER</h1>
+            <p id="final-score" style="margin-bottom: 20px;"></p>
+            <button class="btn-start" onclick="restartGame()">CONTINUE?</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let gender = 'M';
+    let username = 'PLAYER1';
+    let score = 0;
+    let gameLoopId = null;
+    let isGameOver = false;
+
+    const setupScreen = document.getElementById('setup-screen');
+    const gameScreen = document.getElementById('game-screen');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const gameOverOverlay = document.getElementById('game-over');
+
+    // Personagem e obstáculos
+    let player = { x: 0, y: 0, size: 30, speed: 6 };
+    let obstacles = [];
+    let keys = { left: false, right: false };
+
+    function selectGender(g) {
+        gender = g;
+        document.getElementById('opt-m').classList.toggle('active', g === 'M');
+        document.getElementById('opt-f').classList.toggle('active', g === 'F');
+    }
+
+    function resizeCanvas() {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        player.y = canvas.height - 50;
+    }
+
+    function startGame() {
+        const inputName = document.getElementById('username').value.trim();
+        if (inputName) username = inputName.toUpperCase();
+        
+        document.getElementById('player-info').innerText = `${username} [${gender}]`;
+        setupScreen.style.display = 'none';
+        gameScreen.style.display = 'flex';
+
+        resizeCanvas();
+        resetGameVars();
+        
+        // Loop principal
+        gameLoopId = requestAnimationFrame(update);
+    }
+
+    function resetGameVars() {
+        score = 0;
+        obstacles = [];
+        player.x = canvas.width / 2 - player.size / 2;
+        isGameOver = false;
+        gameOverOverlay.style.display = 'none';
+    }
+
+    function restartGame() {
+        resetGameVars();
+        gameLoopId = requestAnimationFrame(update);
+    }
+
+    // Controles Mobile / Teclado
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+
+    const setLeft = (val) => keys.left = val;
+    const setRight = (val) => keys.right = val;
+
+    btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); setLeft(true); });
+    btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); setLeft(false); });
+    btnLeft.addEventListener('mousedown', () => setLeft(true));
+    btnLeft.addEventListener('mouseup', () => setLeft(false));
+
+    btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); setRight(true); });
+    btnRight.addEventListener('touchend', (e) => { e.preventDefault(); setRight(false); });
+    btnRight.addEventListener('mousedown', () => setRight(true));
+    btnRight.addEventListener('mouseup', () => setRight(false));
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') keys.left = true;
+        if (e.key === 'ArrowRight') keys.right = true;
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft') keys.left = false;
+        if (e.key === 'ArrowRight') keys.right = false;
+    });
+
+    // Spawn de Obstáculos
+    let spawnTimer = 0;
+    function handleObstacles() {
+        spawnTimer++;
+        if (spawnTimer % 45 === 0) {
+            const size = Math.random() * 20 + 20;
+            obstacles.push({
+                x: Math.random() * (canvas.width - size),
+                y: -size,
+                size: size,
+                speed: Math.random() * 3 + 3 + (score / 100)
+            });
+        }
+
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            let obs = obstacles[i];
+            obs.y += obs.speed;
+
+            // Colisão AABB
+            if (
+                player.x < obs.x + obs.size &&
+                player.x + player.size > obs.x &&
+                player.y < obs.y + obs.size &&
+                player.y + player.size > obs.y
+            ) {
+                endGame();
+            }
+
+            // Removido da tela
+            if (obs.y > canvas.height) {
+                obstacles.splice(i, 1);
+                score += 10;
+                document.getElementById('score-display').innerText = `SCORE: ${score}`;
+            }
+        }
+    }
+
+    function endGame() {
+        isGameOver = true;
+        document.getElementById('final-score').innerText = `${username}, SEU SCORE FOI: ${score}`;
+        gameOverOverlay.style.display = 'flex';
+        cancelAnimationFrame(gameLoopId);
+    }
+
+    function update() {
+        if (isGameOver) return;
+
+        // Movimento do jogador
+        if (keys.left && player.x > 0) player.x -= player.speed;
+        if (keys.right && player.x < canvas.width - player.size) player.x += player.speed;
+
+        // Desenhar Tela
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Desenhar Jogador
+        ctx.fillStyle = gender === 'M' ? '#00bfff' : '#ff00ff';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.fillRect(player.x, player.y, player.size, player.size);
+
+        // Detalhe visual do avatar no pixel (ex: olhos)
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 0;
+        ctx.fillRect(player.x + 5, player.y + 6, 6, 6);
+        ctx.fillRect(player.x + 19, player.y + 6, 6, 6);
+
+        // Desenhar Obstáculos
+        ctx.fillStyle = '#ff3300';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#ff3300';
+        obstacles.forEach(obs => {
+            ctx.fillRect(obs.x, obs.y, obs.size, obs.size);
+        });
+
+        handleObstacles();
+
+        gameLoopId = requestAnimationFrame(update);
+    }
+</script>
+</body>
+</html>
